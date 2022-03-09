@@ -31,7 +31,7 @@ npm install formik-persist-values --save
 ```
 
 ```
-yard add formik-persist-values
+yarn add formik-persist-values
 ```
 
 # Basic Usage
