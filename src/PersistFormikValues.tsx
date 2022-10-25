@@ -1,10 +1,17 @@
-import { FC, memo, useCallback, useEffect, useMemo } from 'react';
+import { FC, memo, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { FormikValues, useFormikContext } from 'formik';
+import {
+  FormikValues,
+  FormikContextType,
+  useFormikContext,
+  useFormik,
+} from 'formik';
 import useDebounce from 'react-use/lib/useDebounce';
 import omit from 'lodash.omit';
 
 const KEY_DELIMITER = '_';
+
+type FormikType = FormikContextType<any> | ReturnType<typeof useFormik>;
 
 export interface PersistFormikValuesProps {
   name: string;
@@ -40,8 +47,20 @@ const getHash = (obj: any, specificity: number = 7) => {
   return hc;
 };
 
+const useDidMount = () => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  return mounted;
+};
+
 // Controls is working in browser
-const useBrowser = () => !!window;
+const useBrowser = () => {
+  const mounted = useDidMount();
+
+  return mounted && !!window;
+};
 
 const useStorage = (props: PersistFormikValuesProps): Storage | undefined => {
   const { storage = 'localStorage' } = props;
@@ -58,10 +77,10 @@ const useStorage = (props: PersistFormikValuesProps): Storage | undefined => {
 };
 
 const usePersistedString = (
+  { initialValues }: FormikType,
   props: PersistFormikValuesProps
 ): [string | null, (values: FormikValues) => void] => {
   const { name: defaultName, hashInitials, hashSpecificity } = props;
-  const { initialValues } = useFormikContext<any>();
   const keyName = `${defaultName}${KEY_DELIMITER}`;
 
   const name = useMemo(
@@ -99,10 +118,13 @@ const usePersistedString = (
   return [state, handlePersistValues];
 };
 
-const PersistFormikValuesMemo: FC<PersistFormikValuesProps> = props => {
-  const { debounce = 300, persistInvalid, ignoreValues } = props;
-  const { values, setValues, isValid, initialValues } = useFormikContext<any>();
-  const [persistedString, persistValues] = usePersistedString(props);
+export const usePersistFormikValues = (
+  formik: FormikType,
+  options: PersistFormikValuesProps
+): void => {
+  const { debounce = 300, persistInvalid, ignoreValues } = options;
+  const { values, setValues, isValid, initialValues } = formik;
+  const [persistedString, persistValues] = usePersistedString(formik, options);
   const stringValues = JSON.stringify(values);
 
   const handlePersist = useCallback(() => {
@@ -131,6 +153,12 @@ const PersistFormikValuesMemo: FC<PersistFormikValuesProps> = props => {
   }, [persistedString]);
 
   useDebounce(handlePersist, debounce, [stringValues, isValid, persistInvalid]);
+};
+
+const PersistFormikValuesMemo: FC<PersistFormikValuesProps> = props => {
+  const formik = useFormikContext<any>();
+
+  usePersistFormikValues(formik, props);
 
   return null;
 };
